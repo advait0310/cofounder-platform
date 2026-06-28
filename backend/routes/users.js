@@ -1,70 +1,33 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
-const User = require('../models/User');
 const router = express.Router();
+const User = require('../models/User');
+const auth = require('../middleware/auth');
 
-router.get('/profile', authMiddleware, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const { skills, goal, page = 1, limit = 20 } = req.query;
+    const user = await User.findById(req.user._id);
+    const alreadySwiped = [...(user.interestedIn || []), ...(user.passedOn || [])];
+    const filter = { _id: { $ne: req.user._id, $nin: alreadySwiped }, availability: 'Active', isBanned: false };
+    if (skills) filter.skills = { $in: skills.split(',') };
+    if (goal) filter.startupGoal = goal;
+    const users = await User.find(filter)
+      .select('-password -notifications -interestedIn -passedOn')
+      .sort({ 'doerScore.total': -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+    res.json({ success: true, users, swipesLeft: user.swipesLeft });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.put('/profile', authMiddleware, async (req, res) => {
+router.get('/:id', auth, async (req, res) => {
   try {
-    const updates = req.body;
-    delete updates.password;
-    delete updates.isAdmin;
-    delete updates.doerScore;
-
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { ...updates, updatedAt: new Date() },
-      { new: true, runValidators: true }
-    );
-
-    res.json({ success: true, user, message: 'Profile updated' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const user = await User.findById(req.params.id)
+      .select('-password -notifications')
+      .populate('currentTeam', 'name');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    res.json({ success: true, user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/swipe-candidates', authMiddleware, async (req, res) => {
-  try {
-    const { skills, experience } = req.query;
-    
-    let query = { _id: { $ne: req.userId } };
-
-    if (skills) query.skills = { $in: skills.split(',') };
-    if (experience) query.experienceLevel = experience;
-
-    const users = await User.find(query).limit(20);
-
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/:userId', async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/doer-score/:userId', async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId).select('doerScore tasksCompleted weeklyConsistency');
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-module.exports = router; 
+module.exports = router;
