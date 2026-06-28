@@ -1,82 +1,93 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
+const router = express.Router();
 const Match = require('../models/Match');
 const User = require('../models/User');
-const router = express.Router();
+const auth = require('../middleware/auth');
 
-router.post('/swipe', authMiddleware, async (req, res) => {
+router.post('/swipe', auth, async (req, res) => {
   try {
-    const { targetUserId, action, reason } = req.body;
-
-    let match = await Match.findOne({
-      $or: [
-        { userId1: req.userId, userId2: targetUserId },
-        { userId1: targetUserId, userId2: req.userId }
-      ]
-    });
-
-    if (!match) {
-      match = new Match({
-        userId1: req.userId,
-        userId2: targetUserId,
-        userId1Status: action,
-        reason
-      });
-    } else {
-      if (match.userId1.toString() === req.userId) {
-        match.userId1Status = action;
-        match.userId1SwipeDate = new Date();
+    const { targetUserId, action, connectReason } = req.body;
+    if (!targetUserId || !action) return res.status(400).json({ success: false, message: 'targetUserId and action required' });
+    if ((action === 'right' || action === 'super') && !connectReason?.trim()) return res.status(400).json({ success: false, message: 'Please write why you want to connect' });
+    const user = await User.findById(req.user._id);
+    user.resetDailySwipes();
+    if (user.swipesLeft <= 0) return res.status(429).json({ success: false, message: 'Daily swipe limit reached!' });
+    user.swipesLeft -= 1;
+    if (action === 'right' || action === 'super') user.interestedIn.push(targetUserId);
+    else user.passedOn.push(targetUserId);
+    await user.save();
+    let isMatch = false;
+    let matchData = null;
+    if (action === 'right' || action === 'super') {
+      let existing = await Match.findOne({ $or: [{ user1: req.user._id, user2: targetUserId }, { user1: targetUserId, user2: req.user._id }] });
+      if (existing) {
+        if (existing.user1.toString() === req.user._id.toString()) { existing.user1Action = action; existing.user1ConnectReason = connectReason || ''; }
+        else { existing.user2Action = action; existing.user2ConnectReason = connectReason || ''; }
+        const otherAction = existing.user1.toString() === req.user._id.toString() ? existing.user2Action : existing.user1Action;
+        if (otherAction === 'right' || otherAction === 'super') {
+          existing.isMatch = true; existing.status = 'matched'; existing.matchedAt = new Date(); isMatch = true;
+        }
+        await existing.save(); matchData = existing;
       } else {
-        match.userId2Status = action;
-        match.userId2SwipeDate = new Date();
-      }
-
-      if ((match.userId1Status === 'like' || match.userId1Status === 'super') &&
-          (match.userId2Status === 'like' || match.userId2Status === 'super')) {
-        match.isMatched = true;
-        match.chatUnlocked = true;
-        match.matchedAt = new Date();
-        match.status = 'Matched';
+        matchData = await Match.create({ user1: req.user._id, user2: targetUserId, user1Action: action, user1ConnectReason: connectReason || '' });
       }
     }
+    res.json({ success: true, isMatch, swipesLeft: user.swipesLeft, matchData });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
+router.get('/matches', auth, async (req, res) => {
+  try {
+    const matches = await Match.find({ $or: [{ user1: req.user._id }, { user2: req.user._id }], isMatch: true })
+      .populate('user1', 'name avatar skills primaryRole doerScore')
+      .populate('user2', 'name avatar skills primaryRole doerScore')
+      .sort({ matchedAt: -1 });
+    res.json({ success: true, matches });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const match = await Match.findById(req.params.id)
+      .populate('user1', 'name avatar skills primaryRole doerScore bio')
+      .populate('user2', 'name avatar skills primaryRole doerScore bio')
+      .populate('messages.sender', 'name avatar');
+    if (!match) return res.status(404).json({ success: false, message: 'Not found' });
+    res.json({ success: true, match });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.post('/:id/message', auth, async (req, res) => {
+  try {
+    const match = await Match.findById(req.params.id);
+    if (!match || !match.isMatch) return res.status(403).json({ success: false, message: 'No match found' });
+    const msg = { sender: req.user._id, text: req.body.text, createdAt: new Date() };
+    match.messages.push(msg);
     await match.save();
-    res.json(match);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.json({ success: true, message: msg });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/my-matches', authMiddleware, async (req, res) => {
+router.post('/:id/trial', auth, async (req, res) => {
   try {
-    const matches = await Match.find({
-      isMatched: true,
-      $or: [{ userId1: req.userId }, { userId2: req.userId }]
-    }).populate('userId1 userId2');
-
-    res.json(matches);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const match = await Match.findById(req.params.id);
+    if (!match) return res.status(404).json({ success: false, message: 'Not found' });
+    match.trial = { task: req.body.task, assignedTo: req.body.assignedTo, deadline: new Date(req.body.deadline) };
+    match.status = 'trial';
+    await match.save();
+    res.json({ success: true, match });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.post('/:matchId/assign-trial', authMiddleware, async (req, res) => {
+router.put('/:id/trial/complete', auth, async (req, res) => {
   try {
-    const { taskDescription } = req.body;
-    const match = await Match.findByIdAndUpdate(
-      req.params.matchId,
-      {
-        trialTask: 'Build a feature together',
-        trialDescription: taskDescription,
-        trialDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      },
-      { new: true }
-    );
-
-    res.json(match);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const match = await Match.findById(req.params.id);
+    if (!match) return res.status(404).json({ success: false, message: 'Not found' });
+    match.trial.completed = true;
+    match.status = 'trial_complete';
+    await match.save();
+    res.json({ success: true, match });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-module.exports = router; 
+module.exports = router;
