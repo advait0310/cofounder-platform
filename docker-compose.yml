@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:5.0
+    container_name: cobuilder-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - cobuilder-network
+
+  backend:
+    build: ./backend
+    container_name: cobuilder-backend
+    ports:
+      - "5000:5000"
+    environment:
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/cofounder-app
+      JWT_SECRET: your_secret_key_change_in_production
+      PORT: 5000
+      NODE_ENV: development
+      FRONTEND_URL: http://localhost:3000
+    depends_on:
+      - mongodb
+    networks:
+      - cobuilder-network
+    command: npm run dev
+
+  frontend:
+    build: ./frontend
+    container_name: cobuilder-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+      REACT_APP_SOCKET_URL: http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - cobuilder-network
+
+volumes:
+  mongo_data:
+
+networks:
+  cobuilder-network:
+    driver: bridge 
