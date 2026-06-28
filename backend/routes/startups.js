@@ -1,98 +1,76 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
-const Startup = require('../models/Startup');
 const router = express.Router();
+const Startup = require('../models/Startup');
+const auth = require('../middleware/auth');
 
-router.post('/create', authMiddleware, async (req, res) => {
+router.post('/', auth, async (req, res) => {
   try {
-    const { startupName, teamId, idea, problem, solution } = req.body;
+    const startup = await Startup.create({ ...req.body, owner: req.user._id });
+    res.status(201).json({ success: true, startup });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
-    const startup = new Startup({
-      startupName,
-      teamId,
-      idea,
-      problem,
-      solution,
-      publicURL: startupName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now()
-    });
+router.get('/my', auth, async (req, res) => {
+  try {
+    const startups = await Startup.find({ owner: req.user._id });
+    res.json({ success: true, startups });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
 
+router.get('/public/:slug', async (req, res) => {
+  try {
+    const startup = await Startup.findOne({ slug: req.params.slug, isActive: true });
+    if (!startup) return res.status(404).json({ success: false, message: 'Not found' });
+    await Startup.findByIdAndUpdate(startup._id, { $inc: { 'analytics.totalViews': 1 } });
+    res.json({ success: true, startup });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const startup = await Startup.findById(req.params.id)
+      .populate('owner', 'name avatar')
+      .populate('team', 'name');
+    if (!startup) return res.status(404).json({ success: false, message: 'Not found' });
+    res.json({ success: true, startup });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const startup = await Startup.findById(req.params.id);
+    if (!startup) return res.status(404).json({ success: false, message: 'Not found' });
+    if (startup.owner.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorized' });
+    const allowed = ['name','tagline','problem','solution','targetAudience','category','stage','landingPage'];
+    allowed.forEach(f => { if (req.body[f] !== undefined) startup[f] = req.body[f]; });
     await startup.save();
-    res.status(201).json(startup);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.json({ success: true, startup });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.put('/:startupId/landing-page', authMiddleware, async (req, res) => {
+router.post('/public/:slug/lead', async (req, res) => {
   try {
-    const { template, sections } = req.body;
-
-    const startup = await Startup.findByIdAndUpdate(
-      req.params.startupId,
-      { template, sections, isPublished: true },
-      { new: true }
-    );
-
-    res.json(startup);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/:startupId/products', authMiddleware, async (req, res) => {
-  try {
-    const { productName, price, description } = req.body;
-
-    const startup = await Startup.findByIdAndUpdate(
-      req.params.startupId,
-      { $push: { products: { productName, price, description } } },
-      { new: true }
-    );
-
-    res.json(startup);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/:startupId/leads', async (req, res) => {
-  try {
+    const startup = await Startup.findOne({ slug: req.params.slug });
+    if (!startup) return res.status(404).json({ success: false, message: 'Not found' });
     const { email, name } = req.body;
-
-    const startup = await Startup.findByIdAndUpdate(
-      req.params.startupId,
-      {
-        $push: { leads: { email, name, timestamp: new Date() } },
-        $inc: { 'analytics.signups': 1 }
-      },
-      { new: true }
-    );
-
-    res.json(startup);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    if (!email) return res.status(400).json({ success: false, message: 'Email required' });
+    const exists = startup.leads.find(l => l.email === email);
+    if (exists) return res.json({ success: true, message: 'Already subscribed' });
+    startup.leads.push({ email, name: name || '' });
+    startup.analytics.totalSignups += 1;
+    await startup.save();
+    res.json({ success: true, message: 'Subscribed!' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/:startupId/analytics', authMiddleware, async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
-    const startup = await Startup.findById(req.params.startupId);
-    res.json(startup.analytics);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/public/:url', async (req, res) => {
-  try {
-    const startup = await Startup.findOne({ publicURL: req.params.url });
-    if (!startup) return res.status(404).json({ error: 'Not found' });
-
-    await Startup.updateOne({ _id: startup._id }, { $inc: { 'analytics.pageViews': 1 } });
-    res.json(startup);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const startup = await Startup.findById(req.params.id);
+    if (!startup) return res.status(404).json({ success: false, message: 'Not found' });
+    if (startup.owner.toString() !== req.user._id.toString()) return res.status(403).json({ success: false, message: 'Not authorized' });
+    await startup.deleteOne();
+    res.json({ success: true, message: 'Deleted' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 module.exports = router;
