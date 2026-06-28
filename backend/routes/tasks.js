@@ -1,91 +1,81 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
-const Task = require('../models/Task');
-const User = require('../models/User');
 const router = express.Router();
+const Task = require('../models/Task');
+const Team = require('../models/Team');
+const User = require('../models/User');
+const auth = require('../middleware/auth');
 
-router.post('/create', authMiddleware, async (req, res) => {
+router.get('/', auth, async (req, res) => {
+  try {
+    const { teamId, status, assignedTo } = req.query;
+    const filter = {};
+    if (teamId) filter.team = teamId;
+    if (status) filter.status = status;
+    if (assignedTo) filter.assignedTo = assignedTo;
+    const tasks = await Task.find(filter)
+      .populate('assignedTo', 'name avatar')
+      .populate('createdBy', 'name avatar')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, tasks });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.post('/', auth, async (req, res) => {
   try {
     const { teamId, title, description, assignedTo, deadline, priority } = req.body;
-
-    const task = new Task({
-      teamId,
-      title,
-      description,
-      assignedTo,
-      deadline,
-      priority,
-      createdBy: req.userId
+    if (!teamId || !title) return res.status(400).json({ success: false, message: 'teamId and title required' });
+    const team = await Team.findById(teamId);
+    if (!team) return res.status(404).json({ success: false, message: 'Team not found' });
+    const isMember = team.members.find(m => m.user.toString() === req.user._id.toString());
+    if (!isMember) return res.status(403).json({ success: false, message: 'Not a team member' });
+    const task = await Task.create({
+      team: teamId, title, description,
+      assignedTo: assignedTo || null,
+      createdBy: req.user._id,
+      deadline: deadline ? new Date(deadline) : null,
+      priority: priority || 'medium'
     });
-
-    await task.save();
-    await task.populate('assignedTo');
-    res.status(201).json(task);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.put('/:taskId', authMiddleware, async (req, res) => {
-  try {
-    const { status } = req.body;
-
-    const task = await Task.findByIdAndUpdate(
-      req.params.taskId,
-      {
-        status,
-        completedAt: status === 'Done' ? new Date() : null,
-        $push: {
-          statusHistory: {
-            status,
-            changedAt: new Date()
-          }
-        }
-      },
-      { new: true }
-    );
-
-    if (status === 'Done' && task.assignedTo) {
-      await User.findByIdAndUpdate(
-        task.assignedTo,
-        {
-          $inc: { tasksCompleted: 1, doerScore: 2 }
-        }
-      );
+    await task.populate('assignedTo', 'name avatar');
+    await task.populate('createdBy', 'name avatar');
+    if (assignedTo && assignedTo !== req.user._id.toString()) {
+      await User.findByIdAndUpdate(assignedTo, {
+        $push: { notifications: { type: 'task', message: `New task assigned: ${title}`, link: '/tasks', read: false } }
+      });
     }
-
-    res.json(task);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    if (req.io) req.io.to(`team_${teamId}`).emit('task_created', { task });
+    res.status(201).json({ success: true, task });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/team/:teamId', authMiddleware, async (req, res) => {
+router.put('/:id', auth, async (req, res) => {
   try {
-    const tasks = await Task.find({ teamId: req.params.teamId })
-      .populate('assignedTo')
-      .sort({ deadline: 1 });
-
-    res.json(tasks);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Not found' });
+    const allowed = ['title','description','assignedTo','status','priority','deadline'];
+    allowed.forEach(f => { if (req.body[f] !== undefined) task[f] = req.body[f]; });
+    if (req.body.status === 'done' && task.status !== 'done') {
+      task.completedAt = new Date();
+      if (task.assignedTo) {
+        await User.findByIdAndUpdate(task.assignedTo, {
+          $inc: { 'doerScore.tasksCompleted': 1, 'doerScore.total': 2 }
+        });
+      }
+    }
+    await task.save();
+    await task.populate('assignedTo', 'name avatar');
+    if (req.io) req.io.to(`team_${task.team.toString()}`).emit('task_updated', { task });
+    res.json({ success: true, task });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.put('/:taskId/progress', authMiddleware, async (req, res) => {
+router.delete('/:id', auth, async (req, res) => {
   try {
-    const { progressPercentage } = req.body;
-
-    const task = await Task.findByIdAndUpdate(
-      req.params.taskId,
-      { progressPercentage },
-      { new: true }
-    );
-
-    res.json(task);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, message: 'Not found' });
+    await task.deleteOne();
+    if (req.io) req.io.to(`team_${task.team.toString()}`).emit('task_deleted', { taskId: task._id });
+    res.json({ success: true, message: 'Task deleted' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-module.exports = router; 
+module.exports = router;
