@@ -1,40 +1,23 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
 const router = express.Router();
+const auth = require('../middleware/auth');
 
-router.post('/create-order', authMiddleware, async (req, res) => {
+router.post('/create-order', auth, async (req, res) => {
   try {
-    const { amount, productName } = req.body;
-
-    // Mock Razorpay integration
-    const order = {
-      id: 'order_' + Date.now(),
-      amount: amount * 100,
-      currency: 'INR',
-      status: 'created',
-      productName
-    };
-
-    res.json(order);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.json({ success: true, message: 'Payment integration coming soon', orderId: null });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.post('/verify-payment', authMiddleware, async (req, res) => {
+router.post('/verify', auth, async (req, res) => {
   try {
-    const { orderId, paymentId } = req.body;
-
-    // Mock verification
-    res.json({
-      success: true,
-      message: 'Payment verified',
-      orderId,
-      paymentId
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.json({ success: true, message: 'Payment verified' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-module.exports = router; 
+router.get('/orders', auth, async (req, res) => {
+  try {
+    res.json({ success: true, orders: [] });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+module.exports = router;
