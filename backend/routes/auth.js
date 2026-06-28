@@ -1,78 +1,56 @@
 const express = require('express');
+const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { authMiddleware } = require('../middleware/auth');
-const router = express.Router();
+const auth = require('../middleware/auth');
+
+const generateToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'All fields required' });
-    }
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: 'Passwords do not match' });
-    }
-
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ error: 'User already exists' });
-
-    user = new User({ name, email, password });
-    await user.save();
-
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '7d' });
-
-    user.lastLogin = new Date();
-    await user.save();
-
-    res.status(201).json({
-      success: true,
-      token,
-      user: user.toJSON(),
-      message: 'Registered successfully'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const { name, email, password, primaryRole, skills, experienceLevel, hoursPerWeek, startupGoal } = req.body;
+    if (!name || !email || !password)
+      return res.status(400).json({ success: false, message: 'Name, email and password required' });
+    const exists = await User.findOne({ email });
+    if (exists)
+      return res.status(400).json({ success: false, message: 'Email already registered' });
+    const user = await User.create({ name, email, password, primaryRole, skills: skills || [], experienceLevel, hoursPerWeek, startupGoal });
+    const token = generateToken(user._id);
+    res.status(201).json({ success: true, token, user: { _id: user._id, name: user.name, email: user.email, primaryRole: user.primaryRole, doerScore: user.doerScore, isAdmin: user.isAdmin } });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
-
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || 'secret123', { expiresIn: '7d' });
-
-    user.lastLogin = new Date();
-    await user.save();
-
-    res.json({
-      success: true,
-      token,
-      user: user.toJSON(),
-      message: 'Login successful'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    if (!email || !password)
+      return res.status(400).json({ success: false, message: 'Email and password required' });
+    const user = await User.findOne({ email });
+    if (!user || !(await user.matchPassword(password)))
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (user.isBanned)
+      return res.status(403).json({ success: false, message: 'Account banned' });
+    const token = generateToken(user._id);
+    res.json({ success: true, token, user: { _id: user._id, name: user.name, email: user.email, primaryRole: user.primaryRole, doerScore: user.doerScore, isAdmin: user.isAdmin, avatar: user.avatar } });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/me', authMiddleware, async (req, res) => {
+router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const user = await User.findById(req.user._id).select('-password').populate('currentTeam', 'name');
+    res.json({ success: true, user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-module.exports = router; 
+router.put('/profile', auth, async (req, res) => {
+  try {
+    const allowed = ['name','bio','skills','primaryRole','experienceLevel','hoursPerWeek','availability','startupGoal','location','linkedIn','github','lookingFor','avatar'];
+    const updates = {};
+    allowed.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select('-password');
+    res.json({ success: true, user });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+module.exports = router;
