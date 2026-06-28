@@ -1,66 +1,23 @@
 const express = require('express');
-const { authMiddleware } = require('../middleware/auth');
-const SkillCertification = require('../models/SkillCertification');
 const router = express.Router();
+const auth = require('../middleware/auth');
 
-router.post('/verify', authMiddleware, async (req, res) => {
+router.get('/', auth, async (req, res) => {
   try {
-    const { skill, verificationMethod, data } = req.body;
-
-    const certification = new SkillCertification({
-      userId: req.userId,
-      skill,
-      verificationMethod,
-      ...data
-    });
-
-    await certification.save();
-    res.status(201).json(certification);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    const skills = [
+      'Frontend', 'Backend', 'Full Stack', 'Mobile', 'AI/ML',
+      'DevOps', 'Marketing', 'Growth', 'SEO', 'Design',
+      'UI/UX', 'Product', 'Sales', 'Finance', 'Operations',
+      'Data', 'Blockchain', 'Content', 'Legal', 'Branding'
+    ];
+    res.json({ success: true, skills });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.get('/user/:userId', async (req, res) => {
+router.post('/certify', auth, async (req, res) => {
   try {
-    const certifications = await SkillCertification.find({
-      userId: req.params.userId,
-      verified: true
-    });
-
-    res.json(certifications);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    res.json({ success: true, message: 'Skill certification coming soon' });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
 
-router.post('/test/:skill', authMiddleware, async (req, res) => {
-  try {
-    const { skill } = req.params;
-    const { answers } = req.body;
-
-    // Simple scoring logic
-    const score = Math.floor(Math.random() * 100);
-
-    const certification = new SkillCertification({
-      userId: req.userId,
-      skill,
-      verificationMethod: 'test',
-      testScore: score,
-      testDate: new Date(),
-      verified: score >= 70
-    });
-
-    await certification.save();
-
-    res.json({
-      score,
-      passed: score >= 70,
-      certification
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-module.exports = router; 
+module.exports = router;
