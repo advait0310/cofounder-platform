@@ -110,7 +110,7 @@ function RegisterPage({ setIsAuth }) {
 
         <p style={styles.footer}>
           Already have an account?{' '}
-          <a onClick={() => navigate('/login')} style={styles.link}>
+          <a href="#" onClick={(e) => { e.preventDefault(); navigate('/login'); }} style={styles.link}>
             Login here
           </a>
         </p>
