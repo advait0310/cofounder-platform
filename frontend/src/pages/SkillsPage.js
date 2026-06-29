@@ -1,19 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 
 function SkillsPage({ user, logout }) {
-  const [skills, setSkills] = useState([]);
   const [certifications, setCertifications] = useState([]);
-  const [newSkill, setNewSkill] = useState('');
   const [loading, setLoading] = useState(true);
   const [takingTest, setTakingTest] = useState(null);
 
-  useEffect(() => {
-    fetchSkills();
-  }, []);
-
-  const fetchSkills = async () => {
+  const fetchSkills = useCallback(async () => {
     try {
       const res = await axios.get(`/skills/user/${user._id}`);
       setCertifications(res.data);
@@ -22,13 +16,11 @@ function SkillsPage({ user, logout }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user._id]);
 
-  const handleAddSkill = async () => {
-    if (!newSkill) return;
-    setSkills([...skills, newSkill]);
-    setNewSkill('');
-  };
+  useEffect(() => {
+    fetchSkills();
+  }, [fetchSkills]);
 
   const handleTakeTest = async (skill) => {
     try {
@@ -38,7 +30,6 @@ function SkillsPage({ user, logout }) {
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
-
       if (res.data.passed) {
         alert(`🎉 You passed the ${skill} test!`);
         setCertifications([...certifications, res.data.certification]);
@@ -52,16 +43,7 @@ function SkillsPage({ user, logout }) {
     }
   };
 
-  const availableSkills = [
-    'React',
-    'Node.js',
-    'Python',
-    'Vue.js',
-    'TypeScript',
-    'Marketing',
-    'Sales',
-    'UI/UX Design'
-  ];
+  const availableSkills = ['React','Node.js','Python','Vue.js','TypeScript','Marketing','Sales','UI/UX Design'];
 
   if (loading) return <div><Navbar user={user} logout={logout} /><div style={{textAlign: 'center', padding: '50px'}}>Loading...</div></div>;
 
@@ -71,7 +53,6 @@ function SkillsPage({ user, logout }) {
       <div style={styles.container}>
         <h1>📚 Skill Verification</h1>
         <p style={styles.subtitle}>Verify your skills with tests and badges</p>
-
         <h2>Verified Certifications ({certifications.length})</h2>
         <div style={styles.grid}>
           {certifications.map((cert) => (
@@ -83,7 +64,6 @@ function SkillsPage({ user, logout }) {
             </div>
           ))}
         </div>
-
         <h2 style={{marginTop: '40px'}}>Available Skills to Verify</h2>
         <div style={styles.skillsGrid}>
           {availableSkills.map((skill) => (
@@ -92,10 +72,7 @@ function SkillsPage({ user, logout }) {
               <button
                 onClick={() => handleTakeTest(skill)}
                 disabled={takingTest === skill}
-                style={{
-                  ...styles.testBtn,
-                  opacity: takingTest === skill ? 0.6 : 1
-                }}
+                style={{ ...styles.testBtn, opacity: takingTest === skill ? 0.6 : 1 }}
               >
                 {takingTest === skill ? 'Testing...' : 'Take Test'}
               </button>
@@ -108,60 +85,15 @@ function SkillsPage({ user, logout }) {
 }
 
 const styles = {
-  container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '40px 20px'
-  },
-  subtitle: {
-    color: '#666',
-    marginBottom: '30px'
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '20px',
-    marginBottom: '40px'
-  },
-  badgeCard: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    padding: '30px',
-    borderRadius: '12px',
-    textAlign: 'center',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-  },
-  badgeIcon: {
-    fontSize: '48px',
-    marginBottom: '10px'
-  },
-  score: {
-    margin: '10px 0 0 0',
-    fontSize: '12px'
-  },
-  skillsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-    gap: '20px'
-  },
-  skillCard: {
-    background: 'white',
-    padding: '25px',
-    borderRadius: '12px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
-    textAlign: 'center'
-  },
-  testBtn: {
-    width: '100%',
-    padding: '10px',
-    marginTop: '15px',
-    background: '#667eea',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold'
-  }
+  container: { maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' },
+  subtitle: { color: '#666', marginBottom: '30px' },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px' },
+  badgeCard: { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '30px', borderRadius: '12px', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' },
+  badgeIcon: { fontSize: '48px', marginBottom: '10px' },
+  score: { margin: '10px 0 0 0', fontSize: '12px' },
+  skillsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' },
+  skillCard: { background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center' },
+  testBtn: { width: '100%', padding: '10px', marginTop: '15px', background: '#667eea', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }
 };
 
-export default SkillsPage; 
+export default SkillsPage;
