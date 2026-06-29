@@ -1,15 +1,16 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const socketIO = require('socket.io');
 const http = require('http');
+const socketIO = require('socket.io');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const compression = require('compression');
 require('dotenv').config();
 
-// Initialize Express app
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io setup
 const io = socketIO(server, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -17,158 +18,51 @@ const io = socketIO(server, {
   }
 });
 
-// Middleware
-app.use(cors());
+app.use(helmet());
+app.use(compression());
+app.use(morgan('dev'));
+app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.log('❌ MongoDB Error:', err));
 
-// Routes - Auth
-const authRoutes = require('./routes/auth');
-app.use('/api/auth', authRoutes);
+app.use((req, res, next) => { req.io = io; next(); });
 
-// Routes - Users
-const userRoutes = require('./routes/users');
-app.use('/api/users', userRoutes);
+app.use('/api/auth',          require('./routes/auth'));
+app.use('/api/users',         require('./routes/users'));
+app.use('/api/matching',      require('./routes/matching'));
+app.use('/api/ai-matching',   require('./routes/ai-matching'));
+app.use('/api/teams',         require('./routes/teams'));
+app.use('/api/tasks',         require('./routes/tasks'));
+app.use('/api/smart-tasks',   require('./routes/smart-tasks'));
+app.use('/api/startups',      require('./routes/startups'));
+app.use('/api/payments',      require('./routes/payments'));
+app.use('/api/leaderboard',   require('./routes/leaderboard'));
+app.use('/api/skills',        require('./routes/skills'));
+app.use('/api/funding',       require('./routes/funding'));
+app.use('/api/mentorship',    require('./routes/mentorship'));
+app.use('/api/analytics',     require('./routes/analytics'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/admin',         require('./routes/admin'));
 
-// Routes - Matching
-const matchingRoutes = require('./routes/matching');
-app.use('/api/matching', matchingRoutes);
+app.get('/health', (req, res) => res.json({ status: 'OK', db: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected' }));
 
-// Routes - AI Matching
-const aiMatchingRoutes = require('./routes/ai-matching');
-app.use('/api/ai-matching', aiMatchingRoutes);
-
-// Routes - Teams
-const teamRoutes = require('./routes/teams');
-app.use('/api/teams', teamRoutes);
-
-// Routes - Tasks
-const taskRoutes = require('./routes/tasks');
-app.use('/api/tasks', taskRoutes);
-
-// Routes - Smart Tasks
-const smartTaskRoutes = require('./routes/smart-tasks');
-app.use('/api/smart-tasks', smartTaskRoutes);
-
-// Routes - Startups
-const startupRoutes = require('./routes/startups');
-app.use('/api/startups', startupRoutes);
-
-// Routes - Payments
-const paymentRoutes = require('./routes/payments');
-app.use('/api/payments', paymentRoutes);
-
-// Routes - Leaderboard
-const leaderboardRoutes = require('./routes/leaderboard');
-app.use('/api/leaderboard', leaderboardRoutes);
-
-// Routes - Skills
-const skillRoutes = require('./routes/skills');
-app.use('/api/skills', skillRoutes);
-
-// Routes - Funding
-const fundingRoutes = require('./routes/funding');
-app.use('/api/funding', fundingRoutes);
-
-// Routes - Mentorship
-const mentorshipRoutes = require('./routes/mentorship');
-app.use('/api/mentorship', mentorshipRoutes);
-
-// Routes - Equity
-const equityRoutes = require('./routes/equity');
-app.use('/api/equity', equityRoutes);
-
-// Routes - Analytics
-const analyticsRoutes = require('./routes/analytics');
-app.use('/api/analytics', analyticsRoutes);
-
-// Routes - Admin
-const adminRoutes = require('./routes/admin');
-app.use('/api/admin', adminRoutes);
-
-// Health Check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK',
-    timestamp: new Date(),
-    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
-  });
-});
-
-// Socket.io Events
 io.on('connection', (socket) => {
-  console.log('✅ User connected:', socket.id);
-
-  // Join team room
-  socket.on('join_team', (teamId) => {
-    socket.join(`team_${teamId}`);
-    console.log(`User joined team: ${teamId}`);
-  });
-
-  // Send message
-  socket.on('send_message', (data) => {
-    io.to(`team_${data.teamId}`).emit('receive_message', {
-      userId: data.userId,
-      userName: data.userName,
-      message: data.message,
-      timestamp: data.timestamp
-    });
-  });
-
-  // Join match room
-  socket.on('join_match', (matchId) => {
-    socket.join(`match_${matchId}`);
-  });
-
-  // Match notification
-  socket.on('match_found', (data) => {
-    io.emit('new_match', data);
-  });
-
-  // Disconnect
-  socket.on('disconnect', () => {
-    console.log('❌ User disconnected:', socket.id);
-  });
+  console.log('User connected:', socket.id);
+  socket.on('join_team', (teamId) => socket.join(`team_${teamId}`));
+  socket.on('send_message', (data) => io.to(`team_${data.teamId}`).emit('receive_message', data));
+  socket.on('disconnect', () => console.log('User disconnected:', socket.id));
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err);
-  res.status(500).json({ 
-    success: false, 
-    message: err.message || 'Server Error',
-    error: process.env.NODE_ENV === 'development' ? err : {}
-  });
+  console.error(err.stack);
+  res.status(500).json({ success: false, message: err.message || 'Server Error' });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Route not found'
-  });
-});
-
-// Start Server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log('');
-  console.log('╔════════════════════════════════════╗');
-  console.log('║  🚀 CoBuilder Server Running      ║');
-  console.log('╠════════════════════════════════════╣');
-  console.log(`║  Port: ${PORT}                       ║`);
-  console.log(`║  Environment: ${process.env.NODE_ENV || 'development'}      ║`);
-  console.log('║  Socket.io: Enabled                ║');
-  console.log('╚════════════════════════════════════╝');
-  console.log('');
-});
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
-module.exports = { app, io }; 
+module.exports = { app, io };
