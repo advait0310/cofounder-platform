@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -25,15 +24,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (isAuth) {
-      fetchUser();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuth]);
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const res = await axios.get('/auth/me', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -46,7 +37,15 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isAuth) {
+      fetchUser();
+    } else {
+      setLoading(false);
+    }
+  }, [isAuth, fetchUser]);
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -68,7 +67,6 @@ function App() {
       <Routes>
         <Route path="/login" element={isAuth ? <Navigate to="/" /> : <LoginPage setIsAuth={setIsAuth} />} />
         <Route path="/register" element={isAuth ? <Navigate to="/" /> : <RegisterPage setIsAuth={setIsAuth} />} />
-
         {isAuth && user ? (
           <>
             <Route path="/" element={<DashboardPage user={user} logout={logout} />} />
@@ -94,19 +92,8 @@ function App() {
 }
 
 const styles = {
-  loadingContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-  },
-  spinner: {
-    fontSize: '24px',
-    color: 'white',
-    fontWeight: 'bold',
-    animation: 'pulse 1s infinite'
-  }
+  loadingContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+  spinner: { fontSize: '24px', color: 'white', fontWeight: 'bold', animation: 'pulse 1s infinite' }
 };
 
-export default App; 
+export default App;
