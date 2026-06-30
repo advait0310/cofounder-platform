@@ -5,21 +5,19 @@ function Navbar({ user, logout }) {
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
 
-  const go = (path) => (e) => { e.preventDefault(); navigate(path); };
-
   return (
     <nav style={styles.navbar}>
       <div style={styles.container}>
         <h1 style={styles.logo} onClick={() => navigate('/')}>🚀 CoBuilder</h1>
         <ul style={styles.links}>
-          <li><a href="#" onClick={go('/')} style={styles.link}>Dashboard</a></li>
-          <li><a href="#" onClick={go('/swipe')} style={styles.link}>Swipe</a></li>
-          <li><a href="#" onClick={go('/ai-matching')} style={styles.link}>AI Match</a></li>
-          <li><a href="#" onClick={go('/matches')} style={styles.link}>Matches</a></li>
-          <li><a href="#" onClick={go('/leaderboard')} style={styles.link}>Top 100</a></li>
-          <li><a href="#" onClick={go('/startup-builder')} style={styles.link}>Startup</a></li>
-          <li><a href="#" onClick={go('/skills')} style={styles.link}>Skills</a></li>
-          <li><a href="#" onClick={go('/mentorship')} style={styles.link}>Mentor</a></li>
+          <li><span onClick={() => navigate('/')} style={styles.link}>Dashboard</span></li>
+          <li><span onClick={() => navigate('/swipe')} style={styles.link}>Swipe</span></li>
+          <li><span onClick={() => navigate('/ai-matching')} style={styles.link}>AI Match</span></li>
+          <li><span onClick={() => navigate('/matches')} style={styles.link}>Matches</span></li>
+          <li><span onClick={() => navigate('/leaderboard')} style={styles.link}>Top 100</span></li>
+          <li><span onClick={() => navigate('/startup-builder')} style={styles.link}>Startup</span></li>
+          <li><span onClick={() => navigate('/skills')} style={styles.link}>Skills</span></li>
+          <li><span onClick={() => navigate('/mentorship')} style={styles.link}>Mentor</span></li>
         </ul>
         <div style={styles.userSection}>
           <button style={styles.userBtn} onClick={() => setShowMenu(!showMenu)}>
@@ -27,10 +25,10 @@ function Navbar({ user, logout }) {
           </button>
           {showMenu && (
             <div style={styles.dropdown}>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigate('/profile'); setShowMenu(false); }} style={styles.dropdownItem}>Profile</a>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigate('/funding'); setShowMenu(false); }} style={styles.dropdownItem}>Funding</a>
+              <span onClick={() => { navigate('/profile'); setShowMenu(false); }} style={styles.dropdownItem}>Profile</span>
+              <span onClick={() => { navigate('/funding'); setShowMenu(false); }} style={styles.dropdownItem}>Funding</span>
               {user?.isAdmin && (
-                <a href="#" onClick={(e) => { e.preventDefault(); navigate('/admin'); setShowMenu(false); }} style={styles.dropdownItem}>Admin</a>
+                <span onClick={() => { navigate('/admin'); setShowMenu(false); }} style={styles.dropdownItem}>Admin</span>
               )}
               <button onClick={logout} style={styles.logoutBtn}>Logout</button>
             </div>
