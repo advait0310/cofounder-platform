@@ -38,7 +38,7 @@ function LoginPage({ setIsAuth }) {
         </form>
         <p style={styles.footer}>
           Don't have an account?{' '}
-          <a href="#" onClick={(e) => { e.preventDefault(); navigate('/register'); }} style={styles.link}>Register here</a>
+          <span onClick={() => navigate('/register')} style={{...styles.link, cursor: 'pointer'}}>Register here</span>
         </p>
       </div>
     </div>
