@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const demoCards = [
-  { name: 'Maya Chen', role: 'Product Designer', skill: 'UI/UX', score: 92, emoji: '🎨' },
-  { name: 'Alex Rivera', role: 'Full Stack Dev', skill: 'React + Node', score: 88, emoji: '💻' },
-  { name: 'Sam Okafor', role: 'Growth Marketer', skill: 'SEO + Ads', score: 95, emoji: '📈' }
+  { name: 'Maya Chen', role: 'Product Designer', skill: 'UI/UX', score: 92, img: 'https://randomuser.me/api/portraits/women/44.jpg' },
+  { name: 'Alex Rivera', role: 'Full Stack Dev', skill: 'React + Node', score: 88, img: 'https://randomuser.me/api/portraits/men/32.jpg' },
+  { name: 'Sam Okafor', role: 'Growth Marketer', skill: 'SEO + Ads', score: 95, img: 'https://randomuser.me/api/portraits/men/65.jpg' },
+  { name: 'Nina Wu', role: 'Sales Lead', skill: 'B2B + Outreach', score: 94, img: 'https://randomuser.me/api/portraits/women/68.jpg' },
+  { name: 'Leo Martins', role: 'Brand Designer', skill: 'Figma + Motion', score: 87, img: 'https://randomuser.me/api/portraits/men/22.jpg' }
 ];
 
 function LoginPage({ setIsAuth }) {
@@ -13,7 +15,20 @@ function LoginPage({ setIsAuth }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [swiping, setSwiping] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSwiping(true);
+      setTimeout(() => {
+        setActiveIndex((prev) => (prev + 1) % demoCards.length);
+        setSwiping(false);
+      }, 500);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,6 +50,8 @@ function LoginPage({ setIsAuth }) {
   const focusStyle = (e) => e.target.style.borderColor = '#3B82F6';
   const blurStyle = (e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)';
 
+  const getCard = (offset) => demoCards[(activeIndex + offset) % demoCards.length];
+
   return (
     <div style={styles.page}>
       <div style={styles.left}>
@@ -48,21 +65,24 @@ function LoginPage({ setIsAuth }) {
         </div>
 
         <div style={styles.cardStack}>
-          {demoCards.map((c, i) => (
-            <div key={c.name} className={`demo-card demo-card-${i}`} style={{...styles.demoCard, zIndex: 10 - i}}>
-              <div style={styles.cardTop}>
-                <span style={styles.cardEmoji}>{c.emoji}</span>
-                <span style={styles.cardScore}>⚡ {c.score}</span>
-              </div>
-              <h3 style={styles.cardName}>{c.name}</h3>
-              <p style={styles.cardRole}>{c.role}</p>
-              <div style={styles.cardSkillTag}>{c.skill}</div>
-              <div style={styles.cardActions}>
-                <div style={styles.cardX}>✕</div>
-                <div style={styles.cardHeart}>♥</div>
-              </div>
-            </div>
-          ))}
+          <div key={`back2-${activeIndex}`} style={{...styles.demoCard, ...styles.cardBack2}}>
+            <CardContent c={getCard(2)} />
+          </div>
+          <div key={`back1-${activeIndex}`} style={{...styles.demoCard, ...styles.cardBack1}}>
+            <CardContent c={getCard(1)} />
+          </div>
+          <div
+            key={`front-${activeIndex}`}
+            style={{
+              ...styles.demoCard,
+              ...styles.cardFront,
+              transform: swiping ? 'translate(-50%, -50%) translateX(140px) rotate(18deg)' : 'translate(-50%, -50%) translateX(0) rotate(-2deg)',
+              opacity: swiping ? 0 : 1,
+              transition: swiping ? 'all 0.5s cubic-bezier(0.4,0,0.6,1)' : 'all 0.45s cubic-bezier(0.16,1,0.3,1)'
+            }}
+          >
+            <CardContent c={getCard(0)} big />
+          </div>
         </div>
       </div>
 
@@ -105,53 +125,45 @@ function LoginPage({ setIsAuth }) {
         @keyframes float1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-30px) scale(1.1); } }
         @keyframes float2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,40px) scale(0.95); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes cardFloat0 {
-          0% { transform: translate(-50%, -50%) rotate(-4deg) translateY(0px); }
-          50% { transform: translate(-50%, -50%) rotate(-4deg) translateY(-14px); }
-          100% { transform: translate(-50%, -50%) rotate(-4deg) translateY(0px); }
-        }
-        @keyframes cardFloat1 {
-          0% { transform: translate(-50%, -50%) rotate(3deg) translateY(0px) translateX(28px); }
-          50% { transform: translate(-50%, -50%) rotate(3deg) translateY(-10px) translateX(28px); }
-          100% { transform: translate(-50%, -50%) rotate(3deg) translateY(0px) translateX(28px); }
-        }
-        @keyframes cardFloat2 {
-          0% { transform: translate(-50%, -50%) rotate(-1deg) translateY(0px) translateX(56px); }
-          50% { transform: translate(-50%, -50%) rotate(-1deg) translateY(-18px) translateX(56px); }
-          100% { transform: translate(-50%, -50%) rotate(-1deg) translateY(0px) translateX(56px); }
-        }
         .login-box { animation: fadeUp 0.7s cubic-bezier(0.16,1,0.3,1); }
         .login-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,130,246,0.5), 0 0 0 1px rgba(251,191,36,0.3); }
         .login-btn:active:not(:disabled) { transform: translateY(0); }
-        .demo-card { animation: fadeIn 0.8s ease forwards; }
-        .demo-card-0 { animation: fadeIn 0.8s ease forwards, cardFloat0 5s ease-in-out infinite 0.8s; }
-        .demo-card-1 { animation: fadeIn 0.8s ease 0.15s forwards, cardFloat1 5.5s ease-in-out infinite 0.95s; opacity: 0; }
-        .demo-card-2 { animation: fadeIn 0.8s ease 0.3s forwards, cardFloat2 6s ease-in-out infinite 1.1s; opacity: 0; }
-        @media (max-width: 900px) {
-          .login-left-hide { display: none !important; }
-        }
+        @media (max-width: 900px) { .login-left-hide { display: none !important; } }
       `}</style>
     </div>
   );
 }
 
+function CardContent({ c, big }) {
+  return (
+    <>
+      <div style={styles.cardImgWrap}>
+        <img src={c.img} alt={c.name} style={styles.cardImg} />
+        <span style={styles.cardScore}>⚡ {c.score}</span>
+      </div>
+      <div style={styles.cardInfo}>
+        <h3 style={styles.cardName}>{c.name}</h3>
+        <p style={styles.cardRole}>{c.role}</p>
+        <div style={styles.cardSkillTag}>{c.skill}</div>
+      </div>
+      {big && (
+        <div style={styles.cardActions}>
+          <div style={styles.cardX}>✕</div>
+          <div style={styles.cardStar}>★</div>
+          <div style={styles.cardHeart}>♥</div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const styles = {
-  page: {
-    minHeight: '100vh',
-    display: 'flex',
-    background: '#0A0E17'
-  },
+  page: { minHeight: '100vh', display: 'flex', background: '#0A0E17' },
   left: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
+    flex: 1, position: 'relative', overflow: 'hidden',
     background: 'linear-gradient(160deg, #0D1320 0%, #131B2E 60%, #0A0E17 100%)',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    padding: '60px 50px',
-    minWidth: '420px'
+    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+    padding: '60px 50px', minWidth: '420px'
   },
   leftBgGrid: {
     position: 'absolute', inset: 0,
@@ -170,62 +182,63 @@ const styles = {
     background: 'radial-gradient(circle, rgba(251,191,36,0.18) 0%, transparent 70%)',
     bottom: '-40px', right: '0px', filter: 'blur(40px)', animation: 'float2 12s ease-in-out infinite'
   },
-  leftContent: {
-    position: 'relative', zIndex: 2, marginBottom: '60px'
-  },
-  leftHeadline: {
-    color: '#fff', fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: 0, letterSpacing: '-0.5px'
-  },
+  leftContent: { position: 'relative', zIndex: 2, marginBottom: '50px' },
+  leftHeadline: { color: '#fff', fontSize: '34px', fontWeight: 800, lineHeight: 1.25, margin: 0, letterSpacing: '-0.5px' },
   gold: {
     background: 'linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%)',
     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
   },
-  leftSub: {
-    color: '#8B92A8', fontSize: '15px', marginTop: '16px', maxWidth: '380px', lineHeight: 1.6
-  },
-  cardStack: {
-    position: 'relative', height: '280px', zIndex: 2
-  },
+  leftSub: { color: '#8B92A8', fontSize: '15px', marginTop: '16px', maxWidth: '380px', lineHeight: 1.6 },
+  cardStack: { position: 'relative', height: '340px', zIndex: 2 },
   demoCard: {
-    position: 'absolute', top: '50%', left: '50%',
-    width: '230px',
-    background: 'rgba(22, 28, 44, 0.85)',
-    backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '16px',
-    padding: '18px',
+    position: 'absolute', top: '50%', left: '50%', width: '230px',
+    background: 'rgba(22, 28, 44, 0.92)',
+    border: '1px solid rgba(255,255,255,0.08)', borderRadius: '18px', overflow: 'hidden',
     boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
   },
-  cardTop: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px'
+  cardBack2: {
+    transform: 'translate(-50%, -50%) translateY(20px) scale(0.88) rotate(5deg)',
+    opacity: 0.45, filter: 'blur(1px)'
   },
-  cardEmoji: { fontSize: '24px' },
+  cardBack1: {
+    transform: 'translate(-50%, -50%) translateY(10px) scale(0.94) rotate(3deg)',
+    opacity: 0.75
+  },
+  cardFront: {},
+  cardImgWrap: { position: 'relative', width: '100%', height: '170px' },
+  cardImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   cardScore: {
-    fontSize: '11px', fontWeight: 700, color: '#FBBF24',
-    background: 'rgba(251,191,36,0.12)', padding: '3px 9px', borderRadius: '20px'
+    position: 'absolute', top: '10px', right: '10px',
+    fontSize: '11px', fontWeight: 700, color: '#0A0E17',
+    background: '#FBBF24', padding: '4px 10px', borderRadius: '20px',
+    boxShadow: '0 2px 10px rgba(251,191,36,0.5)'
   },
+  cardInfo: { padding: '14px 16px 6px' },
   cardName: { color: '#fff', fontSize: '16px', fontWeight: 700, margin: '0 0 2px 0' },
-  cardRole: { color: '#8B92A8', fontSize: '12px', margin: '0 0 12px 0' },
+  cardRole: { color: '#8B92A8', fontSize: '12px', margin: '0 0 10px 0' },
   cardSkillTag: {
     display: 'inline-block', fontSize: '11px', color: '#93C5FD',
-    background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)',
-    padding: '4px 10px', borderRadius: '20px', marginBottom: '14px'
+    background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
+    padding: '4px 10px', borderRadius: '20px'
   },
-  cardActions: { display: 'flex', gap: '10px' },
+  cardActions: { display: 'flex', gap: '8px', padding: '14px 16px 16px', justifyContent: 'center' },
   cardX: {
-    width: '32px', height: '32px', borderRadius: '50%',
-    background: 'rgba(239,68,68,0.12)', color: '#FCA5A5',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'
+    width: '30px', height: '30px', borderRadius: '50%',
+    background: 'rgba(239,68,68,0.15)', color: '#FCA5A5',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px'
+  },
+  cardStar: {
+    width: '30px', height: '30px', borderRadius: '50%',
+    background: 'rgba(251,191,36,0.15)', color: '#FBBF24',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px'
   },
   cardHeart: {
-    width: '32px', height: '32px', borderRadius: '50%',
-    background: 'rgba(59,130,246,0.15)', color: '#60A5FA',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'
+    width: '30px', height: '30px', borderRadius: '50%',
+    background: 'rgba(59,130,246,0.18)', color: '#60A5FA',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px'
   },
   right: {
-    width: '460px',
-    flexShrink: 0,
-    position: 'relative',
+    width: '460px', flexShrink: 0, position: 'relative',
     display: 'flex', justifyContent: 'center', alignItems: 'center',
     padding: '20px', overflow: 'hidden'
   },
