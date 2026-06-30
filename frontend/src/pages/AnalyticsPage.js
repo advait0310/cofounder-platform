@@ -3,7 +3,7 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 
 function AnalyticsPage({ user, logout }) {
-  const [analytics, setAnalytics] = useState(null);
+  const [, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchAnalytics = useCallback(async () => {
