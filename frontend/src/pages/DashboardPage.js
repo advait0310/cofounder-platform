@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 /* ══════════════════════════════════════════════════════════════
@@ -9,7 +9,6 @@ const GD = '#22C55E';
 const BG = '#060B08';
 const BG2 = '#0A120D';
 const CARD_BG = 'rgba(255,255,255,0.02)';
-const CARD_HOVER = 'rgba(255,255,255,0.04)';
 const CARD_BORDER = 'rgba(255,255,255,0.06)';
 const CARD_BORDER_HOVER = 'rgba(74,222,128,0.2)';
 const TEXT_MUTED = 'rgba(255,255,255,0.5)';
@@ -63,10 +62,10 @@ const Card = ({ children, style, className }) => (
 
 const Sparkline = ({ points, color = G, fill = false }) => (
   <svg width="100%" height="100%" viewBox="0 0 100 30" preserveAspectRatio="none" style={{overflow:'visible'}}>
-    {fill && <path d={`M0,30 L0,${points[0]} ${points.map((p,i)=>`L${(i/(points.length-1))*100},${p}`).join(' ')} L100,30 Z`} fill={`url(#grad-${color})`} opacity={0.2} />}
+    {fill && <path d={`M0,30 L0,${points[0]} ${points.map((p,i)=>`L${(i/(points.length-1))*100},${p}`).join(' ')} L100,30 Z`} fill={`url(#grad-${color.replace('#','')})`} opacity={0.2} />}
     <path d={`M0,${points[0]} ${points.map((p,i)=>`L${(i/(points.length-1))*100},${p}`).join(' ')}`} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <defs>
-      <linearGradient id={`grad-${color}`} x1="0" y1="0" x2="0" y2="1">
+      <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stopColor={color} stopOpacity="1" />
         <stop offset="100%" stopColor={color} stopOpacity="0" />
       </linearGradient>
@@ -132,7 +131,7 @@ export default function DashboardPage({ user, logout }) {
         <div style={{ width: '250px', background: BG2, borderRight: `1px solid ${CARD_BORDER}`, display: 'flex', flexDirection: 'column', zIndex: 10 }}>
           
           {/* Logo */}
-          <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ padding: '24px 20px', display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }} onClick={() => navigate('/')}>
             <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: `linear-gradient(135deg, ${G}, ${GD})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#000', fontWeight: 900, fontSize: '12px' }}>BM</div>
             <span style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.5px' }}>BuildMate</span>
           </div>
@@ -171,7 +170,7 @@ export default function DashboardPage({ user, logout }) {
                   <Icon name="star" size={10} color="#FBBF24" /> Elite Builder
                 </div>
               </div>
-              <Icon name="settings" size={14} color={TEXT_MUTED} style={{cursor:'pointer'}} />
+              <Icon name="settings" size={14} color={TEXT_MUTED} style={{cursor:'pointer'}} onClick={logout} />
             </div>
 
             {/* Doer Score Widget in Sidebar */}
@@ -179,7 +178,7 @@ export default function DashboardPage({ user, logout }) {
               <div style={{ position: 'relative', width: '90px', height: '90px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
                   <circle cx="50" cy="50" r="45" fill="none" stroke={CARD_BORDER} strokeWidth="6" />
-                  <circle cx="50" cy="50" r="45" fill="none" stroke={G} strokeWidth="6" strokeDasharray="283" strokeDashoffset="283 * (1 - 0.92)" strokeLinecap="round" style={{ filter: `drop-shadow(0 0 4px ${G})` }} />
+                  <circle cx="50" cy="50" r="45" fill="none" stroke={G} strokeWidth="6" strokeDasharray="283" strokeDashoffset={283 * (1 - 0.92)} strokeLinecap="round" style={{ filter: `drop-shadow(0 0 4px ${G})` }} />
                 </svg>
                 <div style={{ position: 'absolute', textAlign: 'center' }}>
                   <div style={{ fontSize: '24px', fontWeight: 800, color: WHITE, lineHeight: 1 }}>92</div>
@@ -343,7 +342,7 @@ export default function DashboardPage({ user, logout }) {
                     <div style={{ position: 'relative', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <svg width="100%" height="100%" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
                         <circle cx="50" cy="50" r="45" fill="none" stroke={CARD_BORDER} strokeWidth="8" />
-                        <circle cx="50" cy="50" r="45" fill="none" stroke={WHITE} strokeWidth="8" strokeDasharray="283" strokeDashoffset="283 * (1 - 0.72)" strokeLinecap="round" />
+                        <circle cx="50" cy="50" r="45" fill="none" stroke={WHITE} strokeWidth="8" strokeDasharray="283" strokeDashoffset={283 * (1 - 0.72)} strokeLinecap="round" />
                       </svg>
                       <div style={{ position: 'absolute', fontSize: '14px', fontWeight: 700 }}>72%</div>
                     </div>
